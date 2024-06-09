@@ -1,39 +1,60 @@
-﻿using API.Models;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+
+using API.Interfaces;
+using API.Models;
+using AutoMapper;
 
 namespace API.Controllers;
 
 // [Route("api/ciudades")]
 public class CitiesController : BaseApiController
 {
-  private readonly CitiesDataStore _citiesDataStore;
+  private readonly ICityInfoRepository _cityInfoRepository;
+  private readonly IMapper _mapper;
 
-  public CitiesController(CitiesDataStore citiesDataStore)
+  public CitiesController(ICityInfoRepository cityInfoRepository, IMapper mapper)
   {
-    _citiesDataStore = citiesDataStore ?? throw new ArgumentNullException(nameof(citiesDataStore));
+    _cityInfoRepository = cityInfoRepository ?? throw new ArgumentNullException(nameof(cityInfoRepository));
+    _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
   }
 
   [HttpGet]
-  public ActionResult<IEnumerable<CityDto>> GetCities()
+  public async Task<ActionResult<IEnumerable<CityWithOutPointsOfInterestDto>>> GetCities()
   {
-    return Ok(_citiesDataStore.Cities);
+    var cities = await _cityInfoRepository.GetCitiesAsync();
+    return Ok(_mapper.Map<IEnumerable<CityWithOutPointsOfInterestDto>>(cities));
+    // var results = new List<CityWithOutPointsOfInterestDto>();
+    // foreach (var city in cities)
+    // {
+    //   results.Add(new CityWithOutPointsOfInterestDto
+    //   {
+    //     Id = city.Id,
+    //     Name = city.Name,
+    //     Description = city.Description,
+    //   });
+    // }
+    // return Ok(results);
   }
 
   [HttpGet("{id}")]
-  public ActionResult<CityDto> GetCityById(int id)
+  public async Task<IActionResult> GetCityById(int id, bool includePointsOfInterest = false)
   {
-    // find city
-    var cityToReturn = _citiesDataStore.Cities.FirstOrDefault(c => c.Id == id);
+    var city = await _cityInfoRepository.GetCityAsync(id, includePointsOfInterest);
 
-    if (cityToReturn is null)
+    if (city is null)
     {
-      return NotFound($"City with id: {id} was not found");
+      return NotFound();
     }
 
-    return Ok(cityToReturn);
+    if (includePointsOfInterest)
+    {
+      return Ok(_mapper.Map<CityDto>(city));
+    }
+
+    return Ok(_mapper.Map<CityWithOutPointsOfInterestDto>(city));
   }
 
   [HttpGet("Version")]
   public ContentResult GetVersion()
-    => Content("v1.0.0");
+  => Content("v1.0.0");
 }
